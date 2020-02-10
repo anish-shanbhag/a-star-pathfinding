@@ -7,3 +7,5 @@ A demo of the project can be found here:
 https://anish-shanbhag.github.io/a-star-pathfinding/src/aStar
 
 You can place obstacles using the "Place Obstacles" button, then place a target using the "Place Target" button. The pink circle will pathfind to the green target while avoiding the black obstacles.
+
+![A* Pathfinding Demo](https://anish-shanbhag.github.io/a-star-pathfinding/demo.png)
