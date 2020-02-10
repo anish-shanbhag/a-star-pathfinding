@@ -1,0 +1,429 @@
+<html>
+
+    <head>
+    
+        <script>
+            
+            class Node {
+                
+                constructor (x, y, converted) {
+                    
+                    if (converted) {
+                        
+                        this.x = x;
+                        this.y = y;
+                        
+                    }
+                    
+                    else {
+                        
+                        this.x = Math.floor(x / nodeSize);
+                        this.y = Math.floor(y / nodeSize);
+                        
+                    }
+                    
+                    this.startCost = 0;
+                    
+                    this.cost = 0;
+                    
+                    this.parent = null;
+                    
+                }
+                
+                samePos (node) {
+                    
+                    return this.x == node.x && this.y == node.y;
+                    
+                }
+                
+                walkable () {
+                                                            
+                    if (this.x > width / nodeSize || this.x < 0 || this.y > width / nodeSize || this.y < 0) return false;
+                    
+                    for (var obstacle of obstacles) {
+                    
+                        var deltaX = obstacle.x - Math.max(this.x * nodeSize, Math.min(obstacle.x, this.x * nodeSize + nodeSize));
+
+                        var deltaY = obstacle.y - Math.max(this.y * nodeSize, Math.min(obstacle.y, this.y * nodeSize + nodeSize));
+                        
+                        if (deltaX * deltaX + deltaY * deltaY < obstacle.size * obstacle.size / 2) return false;
+
+                    }
+
+                    return true;
+                    
+                }
+                
+            }
+            
+            class Pos {
+                
+                constructor (x, y, size, imageName, visible) {
+                    
+                    this.x = x;
+                    this.y = y;
+                    
+                    this.size = size;
+                    
+                    this.image = loadImage(imageName);
+                    
+                    this.visible = visible;
+                    
+                }
+                
+                draw () {
+                    
+                    ctx.drawImage(this.image, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+                    
+                }
+                
+            }
+            
+            class Pointer extends Pos {
+                
+                constructor () {
+                    
+                    super(0, 0, 20, "target", true);
+                    
+                    this.targetImage = loadImage("targetPointer");
+                    this.obstacleImage = loadImage("obstaclePointer");
+                    
+                    this.mode = "target";
+                    
+                }
+                
+                draw () {
+                    
+                   ctx.drawImage(this.mode == "target" ? this.targetImage : this.obstacleImage, this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+                    
+                }
+                
+                setMode (mode) {
+                    
+                    this.mode = mode;
+                    this.size = 20;
+                    
+                    var other = mode == "target" ? "obstacles" : "target";
+                    
+                    document.getElementById(mode).className = "selected";
+                    document.getElementById(other).className = "deselected";
+                    
+                }
+                
+            }
+                                
+            var width = 600, height = 600;
+                                                                        
+            var open = [];
+            
+            var path = [];
+            
+            var obstacles = [];
+                                                
+            var nodeSize = 20;
+            
+            var adjacentDeltas = [1, 0, 1, 1, 0, 1, -1, 1, -1, 0, -1, -1, 0, -1, 1, -1];
+                        
+            var message = { text : "", alpha : 1 };
+            
+            var pointer = new Pointer();
+            
+            var player = new Pos(width / 2, height / 2, 20, "player", true);
+            
+            var target = new Pos(width / 2, height / 2, 20, "target", true);
+                                    
+            var lastPlacedObstacle = 0;
+            
+            var canvas, ctx, lastFrame;
+                        
+            window.onload = function () {
+                                                
+                canvas = document.getElementById("canvas");
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                canvas.addEventListener ("mousemove", function (event) {
+                    
+                    var rect = canvas.getBoundingClientRect();
+                    
+                    pointer.x = event.clientX - rect.left;
+                    pointer.y = event.clientY - rect.top;
+                                        
+                }, false);
+                
+                canvas.addEventListener ("mousewheel", function(event) {
+                    
+                    if (pointer.mode == "obstacles") {
+                        
+                        var direction = event.wheelDelta > 0;
+                                        
+                        if (direction && pointer.size < 200) pointer.size += 4;
+
+                        else if (!direction && pointer.size > 10) pointer.size -= 4;
+                        
+                    }
+                    
+                    event.preventDefault();
+                    
+                }, false);
+                
+                ctx = canvas.getContext("2d");
+                
+                pointer.setMode("target");
+                
+                lastFrame = Date.now();
+                
+                window.requestAnimationFrame(loop);
+                                                
+            }
+                        
+            function loop () {
+                
+                update((Date.now() - lastFrame) / 1000);
+                                    
+                render();
+                
+                lastFrame = Date.now();
+                
+                window.requestAnimationFrame(loop);
+                
+            }
+            
+            function update (delta) {
+                
+                if (message.alpha > 0) message.alpha = Math.max(0, message.alpha - delta);
+                
+                if (pointer.mode == "obstacles" && Date.now() - lastPlacedObstacle > 200 && pointer.down) {
+                    
+                    obstacles.push(new Pos(pointer.x, pointer.y, pointer.size, "obstacle", true));
+                    
+                    lastPlacedObstacle = Date.now();
+                    
+                }
+                
+                if (path.length > 0) {
+                                        
+                    if (movePlayerTo(path[0].x * nodeSize + nodeSize / 2, path[0].y * nodeSize + nodeSize / 2)) path.splice(0, 1);
+                    
+                }
+                
+                else movePlayerTo(target.x, target.y);
+                                                
+            }
+            
+            function render () {
+                                                
+                ctx.fillStyle = "#FFFFFF";
+                
+                ctx.fillRect(0, 0, width, height);
+                                
+                for (var obstacle of obstacles) obstacle.draw();
+                
+                target.draw();
+                                                
+                if (pointer.in) pointer.draw();
+                
+                player.draw();
+                                                
+                ctx.fillStyle = "rgba(100, 0, 0, " + message.alpha + ")";
+                
+                ctx.textAlign = "center";
+                
+                ctx.font = "24px Impact";
+                
+                ctx.fillText(message.text, width / 2, height / 6);
+                                
+            }
+            
+            function press () {
+                
+                pointer.down = true;
+                
+                if (pointer.mode == "target") {
+                    
+                    if (new Node(pointer.x, pointer.y, false).walkable()) {
+                        
+                        target.x = pointer.x;
+                        target.y = pointer.y;
+                        
+                        calculatePath();
+                        
+                    }
+                    
+                    else showMessage("Target too close to obstacles!");
+                    
+                }
+                
+            }
+            
+            function calculatePath () {
+                                                
+                open = [];
+                
+                path = [];
+                
+                var end = new Node(target.x, target.y, false);
+                
+                var start = new Node(player.x, player.y, false);
+                
+                open.push(start);
+                
+                while (open.length > 0) {
+                    
+                    //Part 1: Choose current node by getting the lowest cost node in the open list
+                    
+                    var current = open[0];
+                                                                                                    
+                    for (var node of open) if (node.cost < current.cost) current = node;
+                                        
+                    open.splice(open.indexOf(current), 1);
+                    
+                    path.push(current);
+                    
+                    if (current.samePos(end)) {
+                                                                        
+                        path = [];
+                        
+                        var pathNode = current;
+                        
+                        while (pathNode != null) {
+                            
+                            path.push(pathNode);
+                            
+                            pathNode = pathNode.parent;
+                            
+                        }
+                        
+                        path = path.reverse();
+                        
+                        break;
+                        
+                    }
+                    
+                    //Part 2: Iterate over nodes adjacent to current node, and if they are eligible, add them to the open list
+                    
+                    adjacentLoop:
+                    
+                    for (var i = 0; i < adjacentDeltas.length - 1; i += 2) {
+                        
+                        var child = new Node(current.x + adjacentDeltas[i], current.y + adjacentDeltas[i + 1], true);
+                        
+                        child.parent = current;
+                        
+                        if (!child.walkable()) continue;
+                        
+                        for (var node of path) {
+                            
+                            if (child.samePos(node)) continue adjacentLoop;
+
+                        }
+
+                        child.startCost = current.startCost + (i % 4 == 0 ? 1 : 1.4);
+                        
+                        child.cost = child.startCost + Math.max(Math.abs(child.x - end.x), Math.abs(child.y - end.y));
+                                                                        
+                        for (var node of open) {
+                            
+                            if (child.samePos(node) && child.startCost < node.startCost) continue adjacentLoop;
+                            
+                        }
+                        
+                        open.push(child);
+                        
+                    }
+                                        
+                }
+                                
+            }
+            
+            function movePlayerTo (x, y) {
+                
+                var deltaX = x - player.x;
+                var deltaY = y - player.y;
+                
+                var magnitude = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                                                
+                if (magnitude > 3) {
+                    
+                    player.x += 4 * deltaX / magnitude;
+                    player.y += 4 * deltaY / magnitude;
+                    
+                }
+
+                return magnitude < 3;
+                
+            }
+            
+            function showMessage (text) {
+                
+                message.text = text;
+                
+                message.alpha = 2;
+                
+            }
+            
+            function loadImage (name) {
+                
+                var image = new Image();
+                
+                image.src = name + ".png";
+                
+                return image;
+                
+            }
+            
+        </script>
+    
+        <style>
+                    
+            #canvas { 
+                
+                border: 5px solid black;
+                cursor: none;
+                
+            }
+            
+            input {
+                                
+                border: 5px groove lightgray;
+                cursor: pointer;             
+                font-size: 20;
+                font-family: impact;
+                                
+            }
+            
+            .selected { background-color: greenyellow; }
+            
+            .deselected { background-color: white; }
+            
+            #clearObstacles { background-color: #bff7ff; }
+            
+            #title { 
+            
+                font-family: monospace;
+                font-size: 30px;
+            
+            }
+        
+        </style>
+        
+    </head>
+
+    <body>
+        
+        <div id="title">Pathfinder</div>
+        
+        <input id="target" type="button" value="Place Target" onclick="pointer.setMode('target')"/>
+        
+        <input id="obstacles" type="button" value="Create Obstacles" onclick="pointer.setMode('obstacles')"/>
+        
+        <input id="clearObstacles" type="button" value="Clear Obstacles" onclick="obstacles = []"/>
+               
+        <br/> <br/>
+    
+        <canvas id="canvas"  onmousedown="press()" onmouseup="pointer.down = false" onmouseover="pointer.in = true" onmouseout="pointer.in = false"/>  
+    
+    </body>
+    
+</html>
