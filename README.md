@@ -1,5 +1,5 @@
 # a-star-pathfinding
-A project that was created for the AP Computer Science Principles Create Performance Task.
+This was a project that was created for the AP Computer Science Principles Create Performance Task.
 
 It implements the A* Pathfinding Algorithm in JavaScript and allows the user to visualize the algorithm in action.
 
